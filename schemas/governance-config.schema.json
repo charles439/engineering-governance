@@ -32,6 +32,18 @@
         "additionalProperties": false
       }
     },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "mode": {"type": "string", "enum": ["strict", "ratchet"]},
+        "allowed_rules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["no-cycle", "no-forbidden-dependencies"]}
+        }
+      },
+      "additionalProperties": false
+    },
     "checks": {
       "type": "object",
       "properties": {
@@ -41,7 +53,16 @@
           "properties": {
             "no_new_cycles": {"type": "boolean"},
             "no_new_forbidden_dependencies": {"type": "boolean"},
-            "require_dependency_graph": {"type": "boolean"}
+            "require_dependency_graph": {"type": "boolean"},
+            "forbidden_dependencies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {"from": {"type": "string"}, "to": {"type": "string"}},
+                "additionalProperties": false
+              }
+            }
           },
           "additionalProperties": false
         },

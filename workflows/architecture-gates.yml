@@ -19,19 +19,8 @@ on:
         description: Full SHA of the checked-out reviewed commit.
         required: true
         type: string
-      dependency_report:
-        description: Relative dependency-cruiser JSON filename inside the dependency artifact; caller must generate it from a verified head checkout and validate source-root coverage.
-        required: false
-        type: string
-        default: dependency-cruiser-report.json
-      dependency_artifact_name:
-        description: Optional artifact name from this workflow run containing the dependency report; same-run download does not establish report provenance.
-        required: false
-        type: string
-        default: ''
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
@@ -41,7 +30,6 @@ jobs:
       GOVERNANCE_IMAGE: ${{ inputs.image }}
       GOVERNANCE_BASE: ${{ inputs.base }}
       GOVERNANCE_HEAD: ${{ inputs.head }}
-      GOVERNANCE_DEPENDENCY_REPORT: ${{ inputs.dependency_report }}
     steps:
       - name: Validate immutable workflow inputs
         shell: bash
@@ -59,15 +47,6 @@ jobs:
             echo 'FAIL head must be a full 40-character commit SHA' >&2
             exit 1
           fi
-          if [[ -z "$GOVERNANCE_DEPENDENCY_REPORT" ||
-                "$GOVERNANCE_DEPENDENCY_REPORT" == /* ||
-                "$GOVERNANCE_DEPENDENCY_REPORT" == *$'\n'* ||
-                "$GOVERNANCE_DEPENDENCY_REPORT" == *$'\r'* ||
-                "/$GOVERNANCE_DEPENDENCY_REPORT/" == */../* ||
-                "/$GOVERNANCE_DEPENDENCY_REPORT/" == */./* ]]; then
-            echo 'FAIL dependency_report must be a relative filename path without dot segments' >&2
-            exit 1
-          fi
 
   governance:
     needs: preflight
@@ -78,34 +57,27 @@ jobs:
         with:
           ref: ${{ inputs.head }}
           fetch-depth: 0
-      - name: Download dependency report artifact
-        if: ${{ inputs.dependency_artifact_name != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.dependency_artifact_name }}
-          path: ${{ runner.temp }}/architecture-gates-dependency-report
-      - name: Run core governance gates
+      - name: Provision the isolated TypeScript governance runtime
+        shell: bash
+        env:
+          GOVERNANCE_TOOL_DIR: ${{ runner.temp }}/architecture-gates-typescript
+        run: |
+          set -euo pipefail
+          test ! -e "$GOVERNANCE_TOOL_DIR"
+          governance provision --tool typescript --target "$GOVERNANCE_TOOL_DIR"
+          printf 'GOVERNANCE_TOOL_DIR=%s\n' "$GOVERNANCE_TOOL_DIR" >> "$GITHUB_ENV"
+      - name: Verify the isolated TypeScript governance runtime
+        shell: bash
+        run: governance doctor --tool typescript
+      - name: Run core governance gates with a fresh dependency scan
         env:
           GOVERNANCE_CONFIG: ${{ inputs.config }}
           GOVERNANCE_BASE: ${{ inputs.base }}
           GOVERNANCE_HEAD: ${{ inputs.head }}
-          GOVERNANCE_DEPENDENCY_ARTIFACT_NAME: ${{ inputs.dependency_artifact_name }}
-          GOVERNANCE_DEPENDENCY_REPORT: ${{ inputs.dependency_report }}
-          GOVERNANCE_DEPENDENCY_ROOT: ${{ runner.temp }}/architecture-gates-dependency-report
         shell: bash
         run: |
           set -euo pipefail
-          dependency_input=()
-          if [[ -n "$GOVERNANCE_DEPENDENCY_ARTIFACT_NAME" ]]; then
-            report_path="$GOVERNANCE_DEPENDENCY_ROOT/$GOVERNANCE_DEPENDENCY_REPORT"
-            if [[ ! -s "$report_path" ]]; then
-              echo "FAIL dependency report not found in downloaded artifact: $GOVERNANCE_DEPENDENCY_REPORT" >&2
-              exit 1
-            fi
-            dependency_input=(--dependency-input "$report_path")
-          fi
           governance check \
             --config "$GOVERNANCE_CONFIG" \
-            "${dependency_input[@]}" \
             --base "$GOVERNANCE_BASE" \
             --head "$GOVERNANCE_HEAD"

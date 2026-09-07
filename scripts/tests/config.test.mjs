@@ -29,6 +29,33 @@ test('parses and validates the TypeScript fixture', () => {
   assert.equal(result.config.checks.architecture.no_new_cycles, true);
 });
 
+test('defaults and validates the top-level dependency baseline policy', () => {
+  const config = parseGovernanceYaml(`
+governance:
+  version: "1.0"
+  profile: "python-typescript-monorepo"
+project:
+  name: baseline
+modules:
+  - name: api
+    path: api
+    owner: platform
+baseline:
+  mode: ratchet
+  allowed_rules:
+    - no-cycle
+    - no-forbidden-dependencies
+`);
+  assert.deepEqual(validateGovernanceConfig(config, { profilesDir }), []);
+  assert.deepEqual(validateGovernanceConfig({ ...config, baseline: { mode: 'ratchet', allowed_rules: ['no-cycle', 'no-cycle'] } }, { profilesDir }), [
+    'baseline.allowed_rules must not contain duplicates',
+  ]);
+  assert.deepEqual(validateGovernanceConfig({ ...config, baseline: { mode: 'loose', allowed_rules: ['no-secrets'] } }, { profilesDir }), [
+    'baseline.mode must be strict or ratchet',
+    'baseline.allowed_rules must contain only no-cycle and no-forbidden-dependencies',
+  ]);
+});
+
 test('rejects duplicate modules and paths escaping the project', () => {
   const config = parseGovernanceYaml(`
 governance:

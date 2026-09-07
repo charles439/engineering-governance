@@ -18,7 +18,7 @@ What is the chosen architecture and boundary?
 
 State the scope explicitly. Name approved pattern and exemplar paths when future changes must follow them.
 
-Keep every affected path or pattern on the single comma-separated `Affected paths:` line above. Changed accepted ADRs are combined and must cover every changed protected path.
+Keep every affected path or pattern on the single comma-separated `Affected paths:` line above. New Accepted ADRs and Proposed → Accepted ADRs are combined and must cover every changed protected path.
 
 ## Invariants and enforcement
 

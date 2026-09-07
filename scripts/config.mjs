@@ -171,7 +171,7 @@ export function validateGovernanceConfig(config, options = {}) {
   const profilesDir = options.profilesDir;
   if (!config || typeof config !== 'object' || Array.isArray(config)) return ['configuration must be a mapping'];
 
-  for (const key of Object.keys(config)) if (!['governance', 'project', 'modules', 'checks'].includes(key)) errors.push(`unknown top-level section: ${key}`);
+  for (const key of Object.keys(config)) if (!['governance', 'project', 'modules', 'checks', 'baseline'].includes(key)) errors.push(`unknown top-level section: ${key}`);
 
   for (const key of ['governance', 'project', 'modules']) {
     if (!(key in config)) errors.push(`missing required section: ${key}`);
@@ -229,11 +229,31 @@ export function validateGovernanceConfig(config, options = {}) {
   if (config.checks?.adr_required_for !== undefined && (!Array.isArray(config.checks.adr_required_for) || config.checks.adr_required_for.some((item) => typeof item !== 'string' || !item.trim()))) {
     errors.push('checks.adr_required_for must be an array of non-empty strings');
   }
-  for (const [section, fields] of Object.entries({ architecture: ['no_new_cycles', 'no_new_forbidden_dependencies', 'require_dependency_graph'], quality: ['require_tests_for_changed_logic', 'require_lint', 'require_typecheck'], release: ['immutable_artifact', 'rollback_plan_required'] })) {
+  for (const [section, fields] of Object.entries({ architecture: ['no_new_cycles', 'no_new_forbidden_dependencies', 'require_dependency_graph', 'forbidden_dependencies'], quality: ['require_tests_for_changed_logic', 'require_lint', 'require_typecheck'], release: ['immutable_artifact', 'rollback_plan_required'] })) {
     const value = config.checks?.[section];
     if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value))) errors.push(`checks.${section} must be a mapping`);
     for (const key of Object.keys(value ?? {})) if (!fields.includes(key)) errors.push(`unknown checks.${section} field: ${key}`);
-    for (const field of fields) if (value?.[field] !== undefined && typeof value[field] !== 'boolean') errors.push(`checks.${section}.${field} must be boolean`);
+    for (const field of fields.filter((field) => field !== 'forbidden_dependencies')) if (value?.[field] !== undefined && typeof value[field] !== 'boolean') errors.push(`checks.${section}.${field} must be boolean`);
+    if (value?.forbidden_dependencies !== undefined && (!Array.isArray(value.forbidden_dependencies) || value.forbidden_dependencies.some((edge) => !edge || typeof edge !== 'object' || Array.isArray(edge) || typeof edge.from !== 'string' || typeof edge.to !== 'string'))) {
+      errors.push('checks.architecture.forbidden_dependencies must be an array of {from, to} mappings');
+    }
+  }
+
+  if ('baseline' in config && (!config.baseline || typeof config.baseline !== 'object' || Array.isArray(config.baseline))) {
+    errors.push('baseline must be a mapping');
+  } else if (config.baseline) {
+    for (const key of Object.keys(config.baseline)) if (!['mode', 'allowed_rules'].includes(key)) errors.push(`unknown baseline field: ${key}`);
+    if (config.baseline.mode !== undefined && !['strict', 'ratchet'].includes(config.baseline.mode)) {
+      errors.push('baseline.mode must be strict or ratchet');
+    }
+    if (config.baseline.allowed_rules !== undefined) {
+      const allowed = ['no-cycle', 'no-forbidden-dependencies'];
+      if (!Array.isArray(config.baseline.allowed_rules) || config.baseline.allowed_rules.some((rule) => typeof rule !== 'string' || !allowed.includes(rule))) {
+        errors.push('baseline.allowed_rules must contain only no-cycle and no-forbidden-dependencies');
+      } else if (new Set(config.baseline.allowed_rules).size !== config.baseline.allowed_rules.length) {
+        errors.push('baseline.allowed_rules must not contain duplicates');
+      }
+    }
   }
   return errors;
 }
