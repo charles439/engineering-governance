@@ -54,7 +54,8 @@ export function launch({ projectRoot = path.resolve(path.dirname(fileURLToPath(i
   if (command === 'bootstrap') return { code: 0, toolkit, revision };
   const entry = path.join(toolkit, 'scripts/governance.mjs');
   if (!fs.existsSync(entry)) throw new Error(`Pinned toolkit entrypoint is missing: ${entry}`);
-  const result = invoke(process.execPath, [entry, ...forwarded], { cwd: projectRoot, env: { ...env, GOVERNANCE_HOME: home }, shell: false, windowsHide: true, stdio: 'inherit' });
+  const executable = fs.realpathSync(entry);
+  const result = invoke(process.execPath, [executable, ...forwarded], { cwd: projectRoot, env: { ...env, GOVERNANCE_HOME: home }, shell: false, windowsHide: true, stdio: 'inherit' });
   if (result.error) throw result.error;
   return { code: result.status ?? 2, toolkit, revision };
 }

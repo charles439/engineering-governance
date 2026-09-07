@@ -71,6 +71,40 @@ function directoryLink(target, link) {
   return link;
 }
 
+function committedToolkitFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'governance-runtime-toolkit-fixture-'));
+  fs.cpSync(path.join(toolkitSource, 'scripts'), path.join(root, 'scripts'), { recursive: true });
+  fs.cpSync(path.join(toolkitSource, 'profiles'), path.join(root, 'profiles'), { recursive: true });
+  execFileSync('git', ['init', '--quiet'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'runtime-fixture@example.invalid'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Runtime Fixture'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['add', '.'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['commit', '--quiet', '-m', 'runtime toolkit fixture'], { cwd: root, stdio: 'ignore' });
+  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  return { root, revision };
+}
+
+function realLauncherProject() {
+  const projectRoot = projectFixture();
+  const launcher = write(projectRoot, 'scripts/governance.mjs', fs.readFileSync(path.join(toolkitSource, 'templates', 'project-config', 'governance.mjs'), 'utf8'));
+  const pinnedToolkit = committedToolkitFixture();
+  const aliasRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'governance-runtime-toolkit-alias-'));
+  const toolkitAlias = directoryLink(pinnedToolkit.root, path.join(aliasRoot, 'toolkit'));
+  const toolDir = fs.mkdtempSync(path.join(os.tmpdir(), 'governance-runtime-child-node-'));
+  fakeNodeRuntime(toolDir);
+  write(projectRoot, '.governance-toolkit.json', JSON.stringify({
+    repository: 'charles439/engineering-governance',
+    ref: pinnedToolkit.revision,
+    directory: toolkitAlias,
+  }));
+  execFileSync('git', ['init', '--quiet'], { cwd: projectRoot, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'runtime-fixture@example.invalid'], { cwd: projectRoot, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Runtime Fixture'], { cwd: projectRoot, stdio: 'ignore' });
+  execFileSync('git', ['add', '.'], { cwd: projectRoot, stdio: 'ignore' });
+  execFileSync('git', ['commit', '--quiet', '-m', 'runtime fixture'], { cwd: projectRoot, stdio: 'ignore' });
+  return { projectRoot, launcher, toolDir };
+}
+
 test('doctor verifies actual dependency-cruiser and TypeScript companion versions', () => {
   const projectRoot = projectFixture();
   const toolkitRoot = toolkitFixture();
@@ -230,4 +264,15 @@ test('project launcher rejects toolkit development diagnostics for authoritative
   const projectRoot = projectFixture();
   write(projectRoot, '.governance-toolkit.json', JSON.stringify({ repository: 'charles439/engineering-governance', ref: pinnedRevision, directory: toolkitSource }));
   assert.throws(() => launch({ projectRoot, args: ['check', '--base', '0123456789abcdef0123456789abcdef01234567', '--head', 'fedcba9876543210fedcba9876543210fedcba98', '--toolkit-dev'], env: {} }), /cannot be combined.*authoritative/);
+});
+
+test('project launcher resolves an aliased toolkit entry before real doctor and Git status runs', () => {
+  const { projectRoot, launcher, toolDir } = realLauncherProject();
+  const env = { ...process.env, GOVERNANCE_TOOL_DIR: toolDir };
+  const doctorOutput = execFileSync(process.execPath, [launcher, 'doctor', '--tool', 'typescript'], { cwd: projectRoot, env, encoding: 'utf8' });
+  assert.match(doctorOutput, /PASS typescript(?:\s|$)/m);
+  const statusOutput = execFileSync(process.execPath, [launcher, 'git', 'status'], { cwd: projectRoot, env, encoding: 'utf8' }).trim();
+  const status = JSON.parse(statusOutput);
+  assert.equal(status.exists, false);
+  assert.ok(status.commonDir);
 });
