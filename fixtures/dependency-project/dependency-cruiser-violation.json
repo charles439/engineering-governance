@@ -1,0 +1,8 @@
+{
+  "modules": [
+    {"source": "src/domain.ts", "dependencies": [{"resolved": "src/infra.ts"}]}
+  ],
+  "summary": {
+    "violations": [{"from": "src/domain.ts", "to": "src/infra.ts", "rule": "no-domain-to-infra"}]
+  }
+}

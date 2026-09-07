@@ -1,0 +1,9 @@
+{
+  "nodes": ["domain", "infrastructure"],
+  "edges": [
+    { "from": "domain", "to": "infrastructure" }
+  ],
+  "forbidden_dependencies": [
+    { "from": "domain", "to": "infrastructure" }
+  ]
+}

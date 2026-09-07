@@ -1,0 +1,7 @@
+{
+  "modules": [
+    {"source": "src/ui.ts", "dependencies": [{"resolved": "src/application.ts"}]},
+    {"source": "src/application.ts", "dependencies": [{"resolved": "src/domain.ts"}]},
+    {"source": "src/domain.ts", "dependencies": []}
+  ]
+}

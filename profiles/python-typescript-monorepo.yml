@@ -1,0 +1,18 @@
+profile: python-typescript-monorepo
+description: Python services plus TypeScript packages in one repository.
+defaults:
+  adr_required_for:
+    - contracts/**
+    - database/**
+    - infra/**
+    - security/**
+  architecture:
+    no_new_cycles: true
+    no_new_forbidden_dependencies: true
+  quality:
+    require_tests_for_changed_logic: true
+    require_lint: true
+    require_typecheck: true
+  release:
+    immutable_artifact: true
+    rollback_plan_required: true

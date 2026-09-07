@@ -1,0 +1,13 @@
+{
+  "name": "engineering-governance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "governance": "scripts/governance.mjs"
+  },
+  "scripts": {
+    "check": "node scripts/governance.mjs check",
+    "test": "node --test scripts/tests/*.test.mjs && node fixtures/dependency-project/test-gate.mjs && node fixtures/typescript-gates/test-gates.mjs && node fixtures/python-gates/test-gates.mjs && node fixtures/tool-gates/test-gates.mjs"
+  }
+}

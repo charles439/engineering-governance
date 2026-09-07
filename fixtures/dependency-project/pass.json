@@ -1,0 +1,8 @@
+{
+  "nodes": ["ui", "application", "domain", "infrastructure"],
+  "edges": [
+    { "from": "ui", "to": "application" },
+    { "from": "application", "to": "domain" },
+    { "from": "application", "to": "infrastructure" }
+  ]
+}

@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - id: release-evidence
+    severity: error
+    description: A release must retain build, test, migration and rollback evidence.
+  - id: environment-separation
+    severity: error
+    description: Preview, staging and production configuration must be explicitly separated.

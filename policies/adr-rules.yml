@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - id: adr-before-merge
+    severity: error
+    description: Architecture-impacting changes require an accepted ADR before merge.
+  - id: adr-status
+    severity: error
+    description: ADR status must be proposed, accepted, superseded or deprecated.

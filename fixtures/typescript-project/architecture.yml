@@ -1,0 +1,5 @@
+architecture:
+  no_new_cycles: true
+  no_new_forbidden_dependencies: true
+  dependencies: []
+  forbidden_dependencies: []

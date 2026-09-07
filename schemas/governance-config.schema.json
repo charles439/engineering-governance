@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://engineering-governance.local/schemas/governance-config.schema.json",
+  "type": "object",
+  "required": ["governance", "project", "modules"],
+  "properties": {
+    "governance": {
+      "type": "object",
+      "required": ["version", "profile"],
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+        "profile": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {"name": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "owner"],
+        "properties": {
+          "name": {"type": "string"},
+          "path": {"type": "string"},
+          "owner": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "adr_required_for": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "architecture": {
+          "type": "object",
+          "properties": {
+            "no_new_cycles": {"type": "boolean"},
+            "no_new_forbidden_dependencies": {"type": "boolean"},
+            "require_dependency_graph": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        "quality": {
+          "type": "object",
+          "properties": {
+            "require_tests_for_changed_logic": {"type": "boolean"},
+            "require_lint": {"type": "boolean"},
+            "require_typecheck": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        "release": {
+          "type": "object",
+          "properties": {
+            "immutable_artifact": {"type": "boolean"},
+            "rollback_plan_required": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

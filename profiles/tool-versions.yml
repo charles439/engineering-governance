@@ -1,0 +1,27 @@
+# This is the single source for direct tool versions and default commands.
+# It does not claim that any transitive dependency is locked.
+tools:
+  typescript:
+    package: dependency-cruiser
+    version: 16.10.4
+    executable: depcruise
+    source: https://github.com/sverweij/dependency-cruiser
+    license: MIT
+    node: ^18.17 || >=20
+    validation_config: .dependency-cruiser.cjs
+    typescript_companion_package: typescript
+    typescript_companion: 5.9.3
+  python:
+    package: import-linter
+    version: '2.2'
+    executable: lint-imports
+    source: https://github.com/seddonym/import-linter
+    license: BSD-2-Clause
+    python: '>=3.9'
+  contract:
+    package: '@stoplight/spectral-cli'
+    version: 6.15.0
+    executable: spectral
+    source: https://github.com/stoplightio/spectral
+    license: Apache-2.0
+    node: ^16.20 || ^18.18 || >=20.17

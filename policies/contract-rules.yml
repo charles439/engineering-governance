@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - id: contract-owner
+    severity: error
+    description: Every public API, event or schema has an accountable owner.
+  - id: compatible-change
+    severity: error
+    description: Breaking contract changes require an ADR and an explicit migration plan.

@@ -1,0 +1,13 @@
+architecture:
+  no_new_cycles: true
+  no_new_forbidden_dependencies: true
+  dependencies:
+    - from: ui
+      to: application
+    - from: application
+      to: domain
+    - from: application
+      to: infrastructure
+  forbidden_dependencies:
+    - from: domain
+      to: infrastructure

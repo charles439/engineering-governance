@@ -1,0 +1,12 @@
+governance:
+  version: "1.0"
+  profile: "python-typescript-monorepo"
+project:
+  name: "fixture-typescript"
+modules:
+  - name: app
+    path: src
+    owner: platform
+checks:
+  adr_required_for:
+    - contracts/**

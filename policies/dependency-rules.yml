@@ -1,0 +1,16 @@
+version: 1
+schema: dependency-graph-v1
+defaults:
+  no_new_cycles: true
+  no_new_forbidden_dependencies: true
+rules:
+  - id: no-cross-layer-import
+    severity: error
+    description: Delivery adapters may depend on application and domain; domain may not depend on adapters.
+  - id: no-cycle
+    severity: error
+    description: A new dependency cycle is forbidden.
+  - id: no-private-module-import
+    severity: error
+    description: A module may not import another module's private implementation path.
+forbidden_dependencies: []

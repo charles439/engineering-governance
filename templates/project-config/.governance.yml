@@ -1,0 +1,20 @@
+governance:
+  version: "1.0"
+  profile: "python-typescript-monorepo"
+
+project:
+  name: "replace-me"
+
+modules:
+  - name: api
+    path: api
+    owner: api-team
+
+checks:
+  adr_required_for:
+    - contracts/**
+    - database/**
+    - infra/**
+  architecture:
+    no_new_cycles: true
+    no_new_forbidden_dependencies: true
