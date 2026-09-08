@@ -14,7 +14,7 @@ policy.
 | --- | --- | --- | --- | --- |
 | Artifact classes | Partial ignore rules mixed generated output with evidence; no shared classification | Generated/forensic evidence, deprecated code, debug probes and experiments are separate classes | Narrow path rules, exact registry categories and staged findings | Correct classification, provenance, purpose and retention decision |
 | Lifecycle | No exact-path registry or review lifecycle | Version-1 registry, task/PR/release/maintenance phases, renewal, retirement and promotion rules | Schema, inherited-entry retention and release expiry | Owner, compatibility, rollback and approval decisions |
-| Contamination | Ignore visibility was treated as cleanup policy | New committed contamination blocks; unchanged historical findings stay advisory; changed known mandatory artifacts block | Immutable range, path history and blocker severity | Diff context and reason for retaining or moving evidence |
+| Contamination | Ignore visibility was treated as cleanup policy | New committed contamination blocks; unchanged historical findings stay advisory; retained known mandatory artifact content/mode/type changes block | Immutable range, path history and blocker severity | Diff context and reason for retaining, removing or promoting evidence |
 | Isolation and cleanup | Ignored files could survive branch switches; no bounded dry-run contract | Experiments use isolated `codex/*` worktrees and maintenance uses bounded review scopes | Read-only inventory/plan; no scheduler or delete executor | Exact action paths, process ownership and execution approval |
 
 The matrix separates executable enforcement from evidence that still requires an
@@ -85,11 +85,14 @@ The phases are intentionally batched:
 
 New committed generated, debug and experimental contamination is a blocker at
 PR and release stages. Historical findings are advisory review items. A
-historical finding that remains unchanged is advisory, while a change to a
-known mandatory artifact is a blocker. A registered entry with an expired
-`reviewBy` is a release blocker, and inherited registry entries cannot be
-removed silently. Missing registry targets are reported as review errors.
-Unknown files remain untouched.
+historical finding that remains unchanged is advisory, while retained known
+mandatory artifact content, mode or type changes are blockers. A reviewed
+removal may retire the target and registry entry in one commit, and a reviewed
+rename may promote the item to a permanent path; normal Git diff and semantic
+gates still apply. A registered entry with an expired `reviewBy` is a release
+blocker, and inherited registry entries cannot be removed silently. Missing
+registry targets are reported as review errors. Unknown files remain
+untouched.
 
 An inventory or plan may summarize an ignored or opaque directory as a review
 scope, but any approved executable action identifies exact files and
