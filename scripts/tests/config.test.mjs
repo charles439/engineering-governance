@@ -96,6 +96,24 @@ checks:
   assert.ok(errors.some((error) => error.includes('require_dependency_graph must be boolean')));
 });
 
+test('accepts repository hygiene as a boolean policy flag', () => {
+  const config = parseGovernanceYaml(`
+governance:
+  version: "1.0"
+  profile: "python-typescript-monorepo"
+project:
+  name: "hygiene-policy"
+modules:
+  - name: api
+    path: api
+    owner: platform
+checks:
+  repository_hygiene: true
+`);
+  assert.deepEqual(validateGovernanceConfig(config, { profilesDir }), []);
+  assert.ok(validateGovernanceConfig({ ...config, checks: { repository_hygiene: 'yes' } }, { profilesDir }).includes('checks.repository_hygiene must be boolean'));
+});
+
 test('rejects profile traversal and unknown policy fields', () => {
   const config = parseGovernanceYaml(`
 governance:

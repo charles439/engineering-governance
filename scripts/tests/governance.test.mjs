@@ -26,7 +26,7 @@ function write(root, relative, content) {
   fs.writeFileSync(target, content);
 }
 
-function createRepository({ withScanPin = false } = {}) {
+function createRepository({ withScanPin = false, withHygiene = false, withLegacyArtifact = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'governance-git-'));
   git(root, ['init', '--quiet']);
   git(root, ['config', 'user.email', 'governance@example.test']);
@@ -42,10 +42,11 @@ modules:
     path: contracts
     owner: platform
 checks:
-  adr_required_for:
+${withHygiene ? '  repository_hygiene: true\n' : ''}  adr_required_for:
     - contracts/**
 `);
   write(root, 'contracts/remove-me.ts', 'export const removeMe = true;\n');
+  if (withLegacyArtifact) write(root, 'artifacts/legacy.bin', 'legacy\n');
   write(root, 'README.md', 'baseline\n');
   if (withScanPin) addScanPin(root);
   commit(root, 'baseline');
@@ -143,6 +144,43 @@ test('authoritative checks reject trusted policy weakening', () => {
   });
   assert.equal(result.code, 1);
   assert.match(result.errors.join('\n'), /baseline\.mode from strict to ratchet/);
+});
+
+test('authoritative checks cannot remove or disable inherited repository hygiene', () => {
+  for (const replacement of ['  repository_hygiene: false\n', '']) {
+    const root = createRepository({ withHygiene: true });
+    const base = git(root, ['rev-parse', 'HEAD']);
+    const current = fs.readFileSync(path.join(root, '.governance.yml'), 'utf8');
+    write(root, '.governance.yml', current.replace('  repository_hygiene: true\n', replacement));
+    const head = commit(root, 'weaken hygiene policy');
+    const result = evaluateGovernance({ cwd: root, base, head, ci: true });
+    assert.equal(result.code, 1, replacement);
+    assert.match(result.errors.join('\n'), /head weakens enforced policy flag: checks\.repository_hygiene/);
+  }
+});
+
+test('enabled hygiene blocks a committed new artifact while preserving old debt as advisory', () => {
+  const root = createRepository({ withHygiene: true, withLegacyArtifact: true });
+  const base = git(root, ['rev-parse', 'HEAD']);
+  write(root, 'outputs/new-report.json', '{"generated":true}\n');
+  const head = commit(root, 'add generated report');
+  fs.rmSync(path.join(root, 'artifacts/legacy.bin'));
+  const result = evaluateGovernance({ cwd: root, base, head, ci: true });
+  assert.equal(result.code, 1, result.errors.join('\n'));
+  assert.match(result.errors.join('\n'), /repository hygiene blocker: outputs\/new-report\.json/);
+  assert.equal(result.hygiene.findings.some((item) => item.path === 'outputs/new-report.json' && item.history === 'new'), true);
+  assert.equal(result.hygiene.advisories.some((item) => item.path === 'artifacts/legacy.bin' && item.history === 'historical'), true);
+});
+
+test('governance hygiene delegates local CLI output to the shared evaluator', () => {
+  const root = createRepository({ withHygiene: true });
+  write(root, 'outputs/local-report.json', '{"generated":true}\n');
+  const result = runGovernance(root, ['hygiene', 'audit', '--format', 'json']);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.command, 'audit');
+  assert.equal(payload.mode, 'local');
+  assert.equal(payload.findings.some((item) => item.path === 'outputs/local-report.json'), true);
 });
 
 test('authoritative checks reject in-range scanner configuration changes', () => {

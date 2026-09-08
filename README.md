@@ -70,4 +70,14 @@ CI 必须显式安装全部 manifest 直接版本并保留 provisioning 证据�
 
 工具只证明已执行且输入可信的结构检查通过，不能自动证明架构决定优良、ADR 由有权人员批准或生产行为正确。覆盖由新的 Accepted ADR，或 Proposed → Accepted 的 ADR 提供；每份提供覆盖的 ADR 必须包含非空白 Context/Decision，并用一行逗号分隔的 `Affected paths:` 声明；这些声明的并集必须覆盖全部 changed protected paths。`policies/` 和 profile 中的声明只有接入对应脚本或业务项目 CI 后才成为执行门禁。
 
+## 仓库产物卫生
+
+产物卫生按“预防污染优先于清理”执行，覆盖四类对象：生成输出/取证证据、死代码或 deprecated 候选、debug probe、experiment。生成输出应进入指定的 ignored 外部或按任务隔离目录；可复现输出与需要保留的取证证据分开，并为证据记录 revision、运行时、provenance、owner 和 retention/review date。ignored 只是 Git 可见性控制，不等于删除或安全边界；已跟踪项需要 diff/PR，未知项不自动处理，旧报告在策略拒绝删除后继续保留。
+
+死代码只能由静态结果提出候选，必须再看动态入口、公共或持久化合同、测试和 owner，不能因无 import 自动删除。Debug probe 要登记用途、owner、证据保留和移除/提升节点；`console.log` 不作一律禁用，本地清理也不改变生产日志保留。Experiment 使用隔离的 `codex/*` worktree，记录 owner、问题、review date 和提升/退休路径；同一 checkout 的 branch 切换会留下 ignored 文件，不能代替隔离。
+
+治理检查按阶段分批：任务开始清点 dirty status、realpath/symlink、active process 和相关路径；任务结束复核本任务拥有的 probe；PR 前检查新增污染；发布前复核 expiry、兼容性和 retention；维护批次用 dry-run 计划列出精确文件，审查 rollback 与测试后再执行。通过 `governance hygiene audit|plan|check` 提供只读检查，阶段为 `task-start`、`task-end`、`pr`、`release`、`maintenance`，输出可选 `--format text|json`，不可变范围按需使用完整 `--base`/`--head`。`audit` 默认 task-start/local，`plan` 默认 task-end/local；PR `check` 要求 strict ancestor immutable range 且 `HEAD == head`，CI 禁止 local evidence。项目以 `checks.repository_hygiene: true` 开启接入。工具不提供 delete executor、自动定时删除或 scheduler；准确命令和 flags 以 accepted design 为准，禁止用 `git clean -fdx` 代替审查。`.governance-hygiene.json` 固定为 version 1 的 exact-path registry，条目含 `category`（deprecated/debug/experimental）、owner、`reviewBy` 和 evidence，不支持 globs、waivers 或 deletion 指令。详见 `F:/Skill/engineering-governance/references/repository-hygiene.md`。
+
+PR 和 release 阶段发现的新 committed contamination 必须阻断；历史发现只作为后续维护评审的 advisory 提示，工具不会自动合成 registry debt 条目。
+
 `governance.mjs` 会在 authoritative base/head 范围内比较可信 base 与 head 的治理策略，并拒绝已识别的 policy weakening；独立 Reviewer 仍需核对规则语义、批准权限和未覆盖的变化。仓库未配置 required check 或等价 ruleset 时，workflow 通过只是证据，不能宣称不可绕过。

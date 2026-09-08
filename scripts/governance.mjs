@@ -9,6 +9,7 @@ import * as dependencyGates from './dependency-gates.mjs';
 import { scanDependencies } from './governance-scan.mjs';
 import { doctor, provision } from './runtime-tools.mjs';
 import { validateAdrLifecycle } from './verify-adr-policy.mjs';
+import { evaluateHygiene, runHygieneCli } from './repository-hygiene.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const profilesDir = path.resolve(scriptDirectory, '..', 'profiles');
@@ -305,6 +306,25 @@ function dependencyEvaluation({ cwd, config, baseConfig, headConfig, dependencyI
   } catch (error) { return { code: 2, errors: [`dependency report evaluation failed: ${error.message}`] }; }
 }
 
+function hygieneFindingMessage(finding) {
+  return `repository hygiene ${finding.severity}: ${finding.path} (${finding.category}/${finding.rule}, ${finding.history}); ${finding.suggestedAction}`;
+}
+
+function hygieneEvaluation({ cwd, configPath, base, head, ci, enabled }) {
+  if (!enabled) return undefined;
+  const authoritative = Boolean(base && head);
+  return evaluateHygiene({
+    cwd,
+    command: authoritative ? 'check' : 'audit',
+    stage: 'pr',
+    base: authoritative ? base : undefined,
+    head: authoritative ? head : undefined,
+    configPath,
+    registryPath: '.governance-hygiene.json',
+    ci,
+  });
+}
+
 function closeSnapshot(snapshot) { if (snapshot?.root && fs.existsSync(snapshot.root)) fs.rmSync(snapshot.root, { recursive: true, force: true }); }
 
 export function evaluateGovernance({ cwd, configPath = '.governance.yml', dependencyInput, dependencyBaseInput, base, head, ci, invoke, toolDir, scanner, scan = scanDependencies } = {}) {
@@ -323,6 +343,19 @@ export function evaluateGovernance({ cwd, configPath = '.governance.yml', depend
     const errors = [];
     const deferred = [];
     errors.push(...policyWeakening(baseConfig, headConfig, changed));
+    const hygiene = hygieneEvaluation({
+      cwd: root,
+      configPath: relativeConfig,
+      base: authoritative ? base : undefined,
+      head: authoritative ? head : undefined,
+      ci,
+      enabled: baseConfig?.checks?.repository_hygiene === true || headConfig?.checks?.repository_hygiene === true,
+    });
+    if (hygiene) {
+      errors.push(...(hygiene.errors ?? []).map((error) => `repository hygiene failed: ${error}`));
+      errors.push(...(hygiene.blockers ?? []).map(hygieneFindingMessage));
+      deferred.push(...(hygiene.advisories ?? []).map(hygieneFindingMessage));
+    }
     const adrPaths = changed.filter(isAdrPath);
     const headDocuments = authoritative ? treeDocuments(root, head, invoke) : worktreeDocuments(root);
     const baseDocuments = treeDocuments(root, authoritative ? base : 'HEAD', invoke);
@@ -389,10 +422,10 @@ export function evaluateGovernance({ cwd, configPath = '.governance.yml', depend
       : dependencyEvaluation({ cwd: root, config: headConfig, baseConfig, headConfig, dependencyInput, dependencyBaseInput, dependencyReports, dependencyScanError });
     errors.push(...dependency.errors);
     deferred.push(...(dependency.deferred ?? []));
-    const code = errors.length ? (dependency.code === 2 ? 2 : 1) : (dependency.code ?? 0);
+    const code = errors.length ? (dependency.code === 2 || hygiene?.code === 2 ? 2 : 1) : (dependency.code ?? hygiene?.code ?? 0);
     if (Object.keys(headConfig.checks?.quality ?? {}).length) deferred.push('quality policy is declared; run the project test, lint, and typecheck CI jobs separately');
     if (Object.keys(headConfig.checks?.release ?? {}).length) deferred.push('release policy is declared; enforce it in the release pipeline separately');
-    return { code, errors, deferred, project: headConfig.project.name, profile: headConfig.governance.profile, changed, base, head, authoritative, dependency };
+    return { code, errors, deferred, project: headConfig.project.name, profile: headConfig.governance.profile, changed, base, head, authoritative, dependency, hygiene };
   } finally {
     closeSnapshot(baseSnapshot);
     closeSnapshot(headSnapshot);
@@ -400,7 +433,7 @@ export function evaluateGovernance({ cwd, configPath = '.governance.yml', depend
 }
 
 function usage() {
-  return 'Usage: governance check [--config .governance.yml] [--dependency-input <head-report>] [--dependency-base-input <base-report>] [--tool-dir <dir>] [--base <full-sha> --head <full-sha>] | governance doctor [--tool-dir <dir>] [--tool <typescript|contract|python>] [--executable <path>] [--python-executable <path>] | governance provision --tool <typescript|contract> --target <directory> | governance git <acquire|status|verify|release|recover-expired> [options]';
+  return 'Usage: governance check [--config .governance.yml] [--dependency-input <head-report>] [--dependency-base-input <base-report>] [--tool-dir <dir>] [--base <full-sha> --head <full-sha>] | governance hygiene audit|plan|check [options] | governance doctor [--tool-dir <dir>] [--tool <typescript|contract|python>] [--executable <path>] [--python-executable <path>] | governance provision --tool <typescript|contract> --target <directory> | governance git <acquire|status|verify|release|recover-expired> [options]';
 }
 
 function parseOptions(args, validOptions) {
@@ -436,6 +469,15 @@ function printDependencyEvidence(dependency) {
   for (const identity of dependency.grandfathered ?? []) console.log(`INFO grandfathered dependency violation: ${String(identity).replaceAll('\0', ' -> ')}`);
 }
 
+function printHygieneEvidence(hygiene) {
+  if (!hygiene) return;
+  const range = hygiene.range?.base && hygiene.range?.head
+    ? `, base=${hygiene.range.base}, head=${hygiene.range.head}`
+    : '';
+  console.log(`INFO repository hygiene evidence (stage=${hygiene.stage}, mode=${hygiene.mode}, findings=${hygiene.findings?.length ?? 0}${range})`);
+  for (const finding of hygiene.findings ?? []) console.log(`INFO ${hygieneFindingMessage(finding)}`);
+}
+
 function runGitCustody(args) {
   const result = spawnSync(process.execPath, [path.join(scriptDirectory, 'git-custody.mjs'), ...args], {
     cwd: process.cwd(),
@@ -456,6 +498,22 @@ function main() {
       runGitCustody(args.slice(1));
       return;
     }
+    if (command === 'hygiene') {
+      if (args.includes('--help') || args.includes('-h')) {
+        console.log('Usage: governance hygiene audit|plan|check [--stage task-start|task-end|pr|release|maintenance] [--base FULL --head FULL] [--format text|json] [--config .governance.yml] [--registry .governance-hygiene.json]');
+        process.exitCode = 0;
+        return;
+      }
+      const result = runHygieneCli(args.slice(1), { cwd: process.cwd() });
+      if (result.format === 'json') console.log(JSON.stringify(result));
+      else {
+        for (const error of result.errors ?? []) console.error(`FAIL ${error}`);
+        console.log(`${result.command} stage=${result.stage} mode=${result.mode} findings=${result.findings?.length ?? 0}`);
+        for (const finding of result.findings ?? []) console.log(`${finding.severity.toUpperCase()} ${finding.path} category=${finding.category} rule=${finding.rule} classification=${finding.classification} history=${finding.history} action=${finding.suggestedAction}`);
+      }
+      process.exitCode = result.code ?? 2;
+      return;
+    }
     if (args.includes('--help') || args.includes('-h')) {
       console.log(usage());
       process.exitCode = 0;
@@ -470,6 +528,7 @@ function main() {
       for (const error of result.errors) console.error(`FAIL ${error}`);
       for (const notice of result.deferred ?? []) console.log(`SKIP ${notice}`);
       printDependencyEvidence(result.dependency);
+      printHygieneEvidence(result.hygiene);
       if (result.code === 0) console.log(`PASS governance core gates (${result.project}, profile=${result.profile}, changed=${result.changed.length}${result.authoritative ? `, base=${result.base}, head=${result.head}` : ', local diagnostic'})`);
       process.exitCode = result.code;
       return;

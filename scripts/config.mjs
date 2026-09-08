@@ -225,9 +225,12 @@ export function validateGovernanceConfig(config, options = {}) {
   }
 
   if ('checks' in config && (!config.checks || typeof config.checks !== 'object' || Array.isArray(config.checks))) errors.push('checks must be a mapping');
-  for (const key of Object.keys(config.checks ?? {})) if (!['adr_required_for', 'architecture', 'quality', 'release'].includes(key)) errors.push(`unknown checks section: ${key}`);
+  for (const key of Object.keys(config.checks ?? {})) if (!['adr_required_for', 'repository_hygiene', 'architecture', 'quality', 'release'].includes(key)) errors.push(`unknown checks section: ${key}`);
   if (config.checks?.adr_required_for !== undefined && (!Array.isArray(config.checks.adr_required_for) || config.checks.adr_required_for.some((item) => typeof item !== 'string' || !item.trim()))) {
     errors.push('checks.adr_required_for must be an array of non-empty strings');
+  }
+  if (config.checks?.repository_hygiene !== undefined && typeof config.checks.repository_hygiene !== 'boolean') {
+    errors.push('checks.repository_hygiene must be boolean');
   }
   for (const [section, fields] of Object.entries({ architecture: ['no_new_cycles', 'no_new_forbidden_dependencies', 'require_dependency_graph', 'forbidden_dependencies'], quality: ['require_tests_for_changed_logic', 'require_lint', 'require_typecheck'], release: ['immutable_artifact', 'rollback_plan_required'] })) {
     const value = config.checks?.[section];

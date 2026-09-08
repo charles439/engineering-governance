@@ -48,6 +48,7 @@
       "type": "object",
       "properties": {
         "adr_required_for": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "repository_hygiene": {"type": "boolean"},
         "architecture": {
           "type": "object",
           "properties": {
